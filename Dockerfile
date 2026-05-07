@@ -1,23 +1,24 @@
 FROM python:3.12-slim
 
-ENV PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1 \
-    CONFIG_PATH=/app/config.yaml \
-    STATE_PATH=/app/state/state.json
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PIP_NO_CACHE_DIR=1
+
+RUN apt-get update && apt-get install -y --no-install-recommends tini \
+    && rm -rf /var/lib/apt/lists/* \
+    && useradd --uid 1000 --create-home --shell /bin/bash app
 
 WORKDIR /app
-
-RUN apt-get update && apt-get install -y --no-install-recommends tini ca-certificates \
-    && rm -rf /var/lib/apt/lists/*
-
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install -r requirements.txt
 
-COPY monitor.py .
+COPY monitor.py webui.py entrypoint.sh ./
+COPY templates ./templates
+COPY static ./static
+RUN chmod +x entrypoint.sh
 
-RUN useradd --system --uid 1000 monitor && \
-    mkdir -p /app/state && chown -R monitor:monitor /app
-USER monitor
+USER app
+EXPOSE 8088
 
-ENTRYPOINT ["/usr/bin/tini", "--"]
-CMD ["python", "/app/monitor.py"]
+ENTRYPOINT ["/usr/bin/tini","--"]
+CMD ["/app/entrypoint.sh"]
