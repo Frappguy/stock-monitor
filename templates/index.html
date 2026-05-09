@@ -7,164 +7,174 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
-<header class="topbar">
-  <div class="brand">
-    <span class="logo">📦</span>
-    <div>
-      <h1>Stock Monitor</h1>
-      <p class="subtitle">ntfy topic: <code>{{ topic }}</code> on <code>{{ server }}</code></p>
+  <header class="topbar">
+    <div class="brand">
+      <span class="logo">📦</span>
+      <div>
+        <h1>Stock Monitor</h1>
+        <p class="subtitle">ntfy topic: <code>{{ topic }}</code> on <code>{{ server }}</code></p>
+      </div>
     </div>
-  </div>
-  <div class="actions">
-    <button class="btn btn-ghost" onclick="testNotification()">🔔 Test push</button>
-    <button class="btn btn-primary" onclick="openDialog()">＋ Add product</button>
-  </div>
-</header>
+    <div class="actions">
+      <button class="btn btn-ghost" onclick="testNotification()">🔔 Test push</button>
+      <button class="btn btn-primary" onclick="openDialog()">＋ Add product</button>
+    </div>
+  </header>
 
-{% with msgs = get_flashed_messages(with_categories=true) %}
-  {% for cat, m in msgs %}<div class="toast toast-{{cat}}">{{ m }}</div>{% endfor %}
-{% endwith %}
+  {% with msgs = get_flashed_messages(with_categories=true) %}
+    {% for cat, m in msgs %}<div class="toast toast-{{cat}}">{{ m }}</div>{% endfor %}
+  {% endwith %}
 
-<main class="grid">
+  <main class="grid">
   {% for p in products %}
-  <article class="card">
-    <header class="card-head">
-      <h2>{{ p.name }}</h2>
-      {% set s = p._status %}
-      {% if s.in_stock is sameas true %}
-        <span class="badge ok">IN STOCK</span>
-      {% elif s.in_stock is sameas false %}
-        <span class="badge muted">sold out</span>
-      {% else %}
-        <span class="badge unknown">unknown</span>
-      {% endif %}
-    </header>
-    <div class="card-body">
-      <div class="row">
-        <span class="lbl">URL</span>
-        <a href="{{ p.url }}" target="_blank" rel="noopener" class="url">{{ p.url }}</a>
+    <article class="card">
+      <header class="card-head">
+        <h2>{{ p.name }}</h2>
+        {% set s = p._status %}
+        {% if s.in_stock is sameas true %}
+          <span class="badge ok">IN STOCK</span>
+        {% elif s.in_stock is sameas false %}
+          <span class="badge muted" title="{{ p.status_label or 'sold out' }}">{{ display_label(p) }}</span>
+        {% else %}
+          <span class="badge unknown">unknown</span>
+        {% endif %}
+      </header>
+      <div class="card-body">
+        <div class="row">
+          <span class="lbl">URL</span>
+          <a href="{{ p.url }}" target="_blank" rel="noopener" class="url">{{ p.url }}</a>
+        </div>
+        <div class="row">
+          <span class="lbl">Mode</span><span class="chip {{ p.mode }}">{{ p.mode | upper }}</span>
+          <span class="lbl">Interval</span><span>{{ p.interval_sec or 60 }}s</span>
+          <span class="lbl">Priority</span><span>{{ p.priority or 'default' }}</span>
+        </div>
+        {% if p.status_label %}
+        <div class="row">
+          <span class="lbl">Status label</span>
+          <code>{{ p.status_label }}</code>
+        </div>
+        {% endif %}
+        {% if p.mode == 'html' %}
+        <div class="row">
+          <span class="lbl">Sold-out text</span>
+          <code>{{ p.sold_out_text or 'Sold out' }}</code>
+          {% if p.case_sensitive %}<span class="chip">case-sensitive</span>{% endif %}
+        </div>
+        {% endif %}
+        <div class="row meta">
+          {% if s.checked_at %}Last checked: <time>{{ s.checked_at }}</time> · {{ s.detail }}{% else %}Not yet checked{% endif %}
+        </div>
       </div>
-      <div class="row">
-        <span class="lbl">Mode</span><span class="chip {{ p.mode }}">{{ p.mode | upper }}</span>
-        <span class="lbl">Interval</span><span>{{ p.interval_sec or 60 }}s</span>
-        <span class="lbl">Priority</span><span>{{ p.priority or 'default' }}</span>
-      </div>
-      {% if p.mode == 'html' %}
-      <div class="row">
-        <span class="lbl">Sold-out text</span>
-        <code>{{ p.sold_out_text or 'Sold out' }}</code>
-        {% if p.case_sensitive %}<span class="chip">case-sensitive</span>{% endif %}
-      </div>
-      {% endif %}
-      <div class="row meta">
-        {% if s.checked_at %}Last checked: <time>{{ s.checked_at }}</time> · {{ s.detail }}{% else %}Not yet checked{% endif %}
-      </div>
-    </div>
-    <footer class="card-foot">
-      <button class="btn btn-ghost" onclick="testProduct('{{ p._id }}', this)">▶ Test now</button>
-      <button class="btn btn-ghost" onclick='editProduct({{ p|tojson|safe }})'>✎ Edit</button>
-      <form method="post" action="/delete/{{ p._id }}" onsubmit="return confirm('Remove tracking for &quot;{{ p.name }}&quot;?');" style="display:inline">
-        <button class="btn btn-danger" type="submit">🗑 Delete</button>
-      </form>
-    </footer>
-  </article>
+      <footer class="card-foot">
+        <button class="btn btn-ghost" onclick="testProduct('{{ p._id }}', this)">▶ Test now</button>
+        <button class="btn btn-ghost" onclick='editProduct({{ p|tojson|safe }})'>✎ Edit</button>
+        <form method="post" action="/delete/{{ p._id }}" onsubmit="return confirm('Remove tracking for &quot;{{ p.name }}&quot;?');" style="display:inline">
+          <button class="btn btn-danger" type="submit">🗑 Delete</button>
+        </form>
+      </footer>
+    </article>
   {% else %}
-  <div class="empty">
-    <p>📡 No products are being tracked yet.</p>
-    <button class="btn btn-primary" onclick="openDialog()">＋ Add your first product</button>
-  </div>
+    <div class="empty">
+      <p>📡 No products are being tracked yet.</p>
+      <button class="btn btn-primary" onclick="openDialog()">＋ Add your first product</button>
+    </div>
   {% endfor %}
-</main>
+  </main>
 
-<dialog id="dlg">
-  <form id="dlgForm" method="post">
-    <header><h2 id="dlgTitle">Add product</h2></header>
-    <label>Name<input name="name" required placeholder="GL.iNet Mudi 7"></label>
-    <label>Product URL<input name="url" type="url" required placeholder="https://store.example.com/products/..."></label>
-
-    <fieldset class="modes">
-      <legend>Mode</legend>
-      <label class="radio">
-        <input type="radio" name="mode" value="shopify" checked onchange="toggleMode()">
-        <span><strong>Shopify</strong><small>Reads /products/x.js. Most reliable.</small></span>
+  <dialog id="dlg">
+    <form id="dlgForm" method="post">
+      <header><h2 id="dlgTitle">Add product</h2></header>
+      <label>Name<input name="name" required placeholder="GL.iNet Mudi 7"></label>
+      <label>Product URL<input name="url" type="url" required placeholder="https://store.example.com/products/..."></label>
+      <label>Status label <small>(optional, shown on the card; long values display as "Custom")</small>
+        <input name="status_label" placeholder="e.g. Available Q3 2026">
       </label>
-      <label class="radio">
-        <input type="radio" name="mode" value="html" onchange="toggleMode()">
-        <span><strong>Generic HTML</strong><small>Searches the page for a "sold out" string.</small></span>
-      </label>
-    </fieldset>
 
-    <div id="htmlFields" hidden>
-      <label>Sold-out text<input name="sold_out_text" placeholder="Sold out"></label>
-      <label class="check"><input type="checkbox" name="case_sensitive"> Case-sensitive match</label>
-    </div>
+      <fieldset class="modes">
+        <legend>Mode</legend>
+        <label class="radio">
+          <input type="radio" name="mode" value="shopify" checked onchange="toggleMode()">
+          <span><strong>Shopify</strong><small>Reads /products/x.js. Most reliable.</small></span>
+        </label>
+        <label class="radio">
+          <input type="radio" name="mode" value="html" onchange="toggleMode()">
+          <span><strong>Generic HTML</strong><small>Searches the page for a "sold out" string.</small></span>
+        </label>
+      </fieldset>
 
-    <div class="grid2">
-      <label>Check interval (s)<input name="interval_sec" type="number" min="15" value="60"></label>
-      <label>Notification priority
-        <select name="priority">
-          <option>min</option>
-          <option>low</option>
-          <option selected>default</option>
-          <option>high</option>
-          <option>urgent</option>
-        </select>
-      </label>
-    </div>
+      <div id="htmlFields" hidden>
+        <label>Sold-out text<input name="sold_out_text" placeholder="Sold out"></label>
+        <label class="check"><input type="checkbox" name="case_sensitive"> Case-sensitive match</label>
+      </div>
 
-    <footer class="dlg-foot">
-      <button class="btn btn-ghost" type="button" onclick="document.getElementById('dlg').close()">Cancel</button>
-      <button class="btn btn-primary" type="submit">Save</button>
-    </footer>
-  </form>
-</dialog>
+      <div class="grid2">
+        <label>Check interval (s)<input name="interval_sec" type="number" min="15" value="60"></label>
+        <label>Notification priority
+          <select name="priority">
+            <option>min</option>
+            <option>low</option>
+            <option selected>default</option>
+            <option>high</option>
+            <option>urgent</option>
+          </select>
+        </label>
+      </div>
 
-<script>
-const dlg = document.getElementById('dlg');
-function toggleMode(){
-  document.getElementById('htmlFields').hidden = document.querySelector('[name=mode]:checked').value !== 'html';
-}
-function openDialog(){
-  document.getElementById('dlgTitle').textContent = 'Add product';
-  const f = document.getElementById('dlgForm');
-  f.reset();
-  f.action = '/add';
-  toggleMode();
-  dlg.showModal();
-}
-function editProduct(p){
-  document.getElementById('dlgTitle').textContent = 'Edit ' + p.name;
-  const f = document.getElementById('dlgForm');
-  f.action = '/edit/' + p._id;
-  f.name.value = p.name;
-  f.url.value = p.url;
-  const radio = f.querySelector('[name=mode][value=' + (p.mode || 'shopify') + ']');
-  if (radio) radio.checked = true;
-  if (f.sold_out_text) f.sold_out_text.value = p.sold_out_text || '';
-  if (f.case_sensitive) f.case_sensitive.checked = !!p.case_sensitive;
-  f.interval_sec.value = p.interval_sec || 60;
-  f.priority.value = p.priority || 'default';
-  toggleMode();
-  dlg.showModal();
-}
-async function testProduct(id, btn){
-  const orig = btn.textContent;
-  btn.textContent = '⏳ Testing…';
-  btn.disabled = true;
-  try {
-    const r = await fetch('/test/' + id, {method:'POST'});
-    const j = await r.json();
-    btn.textContent = j.ok ? (j.in_stock ? '✅ IN STOCK' : '❌ sold out') : '⚠ ' + j.error;
-  } catch(e){
-    btn.textContent = '⚠ ' + e;
-  }
-  setTimeout(() => { btn.textContent = orig; btn.disabled = false; }, 4000);
-}
-async function testNotification(){
-  const r = await fetch('/test-notification', {method:'POST'});
-  const j = await r.json();
-  alert(j.ok ? 'Test push sent. Check your phone.' : 'Failed: ' + (j.error || j.status));
-}
-</script>
+      <footer class="dlg-foot">
+        <button class="btn btn-ghost" type="button" onclick="document.getElementById('dlg').close()">Cancel</button>
+        <button class="btn btn-primary" type="submit">Save</button>
+      </footer>
+    </form>
+  </dialog>
+
+  <script>
+    const dlg = document.getElementById('dlg');
+    function toggleMode(){
+      document.getElementById('htmlFields').hidden = document.querySelector('[name=mode]:checked').value !== 'html';
+    }
+    function openDialog(){
+      document.getElementById('dlgTitle').textContent = 'Add product';
+      const f = document.getElementById('dlgForm');
+      f.reset();
+      f.action = '/add';
+      toggleMode();
+      dlg.showModal();
+    }
+    function editProduct(p){
+      document.getElementById('dlgTitle').textContent = 'Edit ' + p.name;
+      const f = document.getElementById('dlgForm');
+      f.action = '/edit/' + p._id;
+      f.name.value = p.name;
+      f.url.value = p.url;
+      if (f.status_label) f.status_label.value = p.status_label || '';
+      const radio = f.querySelector('[name=mode][value=' + (p.mode || 'shopify') + ']');
+      if (radio) radio.checked = true;
+      if (f.sold_out_text) f.sold_out_text.value = p.sold_out_text || '';
+      if (f.case_sensitive) f.case_sensitive.checked = !!p.case_sensitive;
+      f.interval_sec.value = p.interval_sec || 60;
+      f.priority.value = p.priority || 'default';
+      toggleMode();
+      dlg.showModal();
+    }
+    async function testProduct(id, btn){
+      const orig = btn.textContent;
+      btn.textContent = '⏳ Testing…';
+      btn.disabled = true;
+      try {
+        const r = await fetch('/test/' + id, {method:'POST'});
+        const j = await r.json();
+        btn.textContent = j.ok ? (j.in_stock ? '✅ IN STOCK' : '❌ ' + (j.label || 'sold out')) : '⚠ ' + j.error;
+      } catch(e){
+        btn.textContent = '⚠ ' + e;
+      }
+      setTimeout(() => { btn.textContent = orig; btn.disabled = false; }, 4000);
+    }
+    async function testNotification(){
+      const r = await fetch('/test-notification', {method:'POST'});
+      const j = await r.json();
+      alert(j.ok ? 'Test push sent. Check your phone.' : 'Failed: ' + (j.error || j.status));
+    }
+  </script>
 </body>
 </html>

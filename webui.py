@@ -4,11 +4,14 @@ from pathlib import Path
 from flask import Flask, render_template, request, redirect, url_for, jsonify, flash
 import requests, yaml
 
+from utils import ascii_header, display_label
+
 CONFIG_PATH = Path(os.environ.get("CONFIG_PATH", "/app/config.yaml"))
 STATUS_FILE = Path(os.environ.get("STATE_DIR", "/app/state")) / "status.json"
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("FLASK_SECRET", "stock-monitor-dev-key")
+app.jinja_env.globals["display_label"] = display_label
 log = logging.getLogger("webui")
 
 def load_yaml():
@@ -50,9 +53,9 @@ def index():
         p["_id"] = p.get("id") or make_id(p["url"])
         p["_status"] = status.get(p["_id"], {})
     return render_template("index.html",
-        products=products,
-        topic=os.environ.get("NTFY_TOPIC", "(unset)"),
-        server=os.environ.get("NTFY_SERVER", "https://ntfy.sh"))
+                           products=products,
+                           topic=os.environ.get("NTFY_TOPIC", "(unset)"),
+                           server=os.environ.get("NTFY_SERVER", "https://ntfy.sh"))
 
 def parse_form_to_product(form):
     mode = form.get("mode", "shopify")
@@ -64,6 +67,9 @@ def parse_form_to_product(form):
         "interval_sec": max(15, int(form.get("interval_sec") or 60)),
         "priority": form.get("priority", "default"),
     }
+    label = (form.get("status_label") or "").strip()
+    if label:
+        p["status_label"] = label
     if mode == "html":
         p["sold_out_text"] = (form.get("sold_out_text") or "Sold out").strip()
         p["case_sensitive"] = form.get("case_sensitive") == "on"
@@ -112,13 +118,15 @@ def test(pid):
             j = s.get(target["url"].rstrip("/") + ".js", timeout=20).json()
             variants = j.get("variants", []) or []
             avail = sum(1 for v in variants if v.get("available"))
-            return jsonify(ok=True, in_stock=avail > 0, detail=f"variants={len(variants)} available={avail}")
+            return jsonify(ok=True, in_stock=avail > 0, label=display_label(target),
+                           detail=f"variants={len(variants)} available={avail}")
         else:
             body = s.get(target["url"], timeout=20).text
             needle = target.get("sold_out_text", "Sold out")
             cs = target.get("case_sensitive", False)
             sold_out = (needle if cs else needle.lower()) in (body if cs else body.lower())
-            return jsonify(ok=True, in_stock=not sold_out, detail=f"sold_out_match={sold_out}")
+            return jsonify(ok=True, in_stock=not sold_out, label=display_label(target),
+                           detail=f"sold_out_match={sold_out}")
     except Exception as e:
         return jsonify(ok=False, error=str(e)), 200
 
@@ -129,9 +137,14 @@ def test_notification():
     if not topic:
         return jsonify(ok=False, error="NTFY_TOPIC not set"), 400
     try:
-        r = requests.post(f"{server}/{topic}", data=b"This is a test from your Stock Monitor UI.",
-            headers={"Title": "Stock Monitor — UI test", "Tags": "white_check_mark", "Priority": "default"},
-            timeout=15)
+        r = requests.post(f"{server}/{topic}",
+                          data="This is a test from your Stock Monitor UI.".encode("utf-8"),
+                          headers={
+                              "Title": ascii_header("Stock Monitor - UI test"),
+                              "Tags": "white_check_mark",
+                              "Priority": "default",
+                          },
+                          timeout=15)
         return jsonify(ok=r.ok, status=r.status_code)
     except Exception as e:
         return jsonify(ok=False, error=str(e)), 200
